@@ -32,4 +32,20 @@ public class PhyicsDemo : MonoBehaviour {
     //{
     //    Debug.DrawLine(Vector3.zero, vect);
     //}
+
+    //
+    void OnTriggerEnter(Collider collOther)
+    {
+        //collOther 是對方的碰撞體套件
+
+        Debug.Log(collOther.name);
+
+        //銷毀對方物體
+        GameObject.Destroy(collOther.gameObject);
+    }
+    
+    //一樣有以下三種必然事件
+    //OnTriggerEnter
+    //OnTriggerStay
+    //OnTriggerExit
 }
