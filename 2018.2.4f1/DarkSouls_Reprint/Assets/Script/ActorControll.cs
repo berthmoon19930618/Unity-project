@@ -170,18 +170,27 @@ public class ActorControll : MonoBehaviour
     //攔截使用Update每幀發出訊號的方法，解決後跳動作順移到定點問題
     public void OnJabUpdate()
     {
+
         thrustVec = modle.transform.forward * anim.GetFloat("jabVelocity");
     }
     //指定動畫控制器圖層權重(權重切換)
     public void OnAttackIdleEnter()
     {
+        pi.inputEnabled = true;
+        //lockPlanar = false;//目前不懂為何不需要20181017
         anim.SetLayerWeight(1, 0f);//圖層1為attack層，因打數字不好判別所以使用anim.GetLayerIndex("Attack")如下方方法
         
     }
     public void OnAttack1hAEnter()
     {
+        pi.inputEnabled = false;
+        //lockPlanar = true;//目前不懂為何不需要20181017
         anim.SetLayerWeight(anim.GetLayerIndex("Attack"), 1.0f);//anim.GetLayerIndex("Attack")=圖層1=int 1
         
+    }
+    public void OnAttack1hAUpdate()
+    {
+        thrustVec = modle.transform.forward * anim.GetFloat("attackh1AVelocity");
     }
 
 }
