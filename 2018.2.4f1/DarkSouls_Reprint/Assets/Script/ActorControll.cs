@@ -13,18 +13,26 @@ public class ActorControll : MonoBehaviour
     public float jumpVelocity = 5.0f;//跳躍高度
     public float rollVelocity = 1.0f;//翻滾高度
 
-    [SerializeField]//讓private能顯示在編輯器上
-    private Animator anim;//動畫控制器
+    [Space(10)]
+    [Header("===== Friction Settings  =====")]
+    public PhysicMaterial frictionOne;//物理材質，靜動摩擦力皆為1，算法相加
+    public PhysicMaterial frictionZero;//物理材質，靜動摩擦力皆為0，算法線性相乘
 
+    //[SerializeField]//讓private能顯示在編輯器上
+    private Animator anim;//動畫控制器
+    private Rigidbody rigid;
     //在unity裡做角色位移有兩種組件可以達成一種是用Rigidbody，
     //而另一種是用Character Controll各有優缺點，Rigidbody要做出真實走樓梯運算式非常麻煩但有寫好的重力功能可做勾選，
     //而使用Character Controll他而完美運算出角色走樓梯，且用此組件會有較好的效能分配，但要搞懂Move函式和SimpleMove函式的差別，例如SimpleMove有重力的運算Move則無等等……
-    [SerializeField]
-    private Rigidbody rigid;
+    private CapsuleCollider col;//玩家本身的膠囊碰撞器
+
     private Vector3 planarVec;//移動動量三維組件
     private Vector3 thrustVec;//推力向量
     private bool lockPlanar;//鎖定動量Flag (true = 鎖 , false = 開放)
-
+    //因為這裡 pi.inputEnabled = false;鎖死操作targetDRight就不會再更新了，但因水平方向力量DRight方法使用Mathf.SmoothDamp讓他震盪下來，因此Dmag也還會有值。
+    //再來就是將平面動量Flag更新lockPlanar = true;(鎖死)，將不會因pi.inputEnabled = false;(鎖死)控制信號導致targetDRight = 0;的數值進而導致pi.Dmag = 0;的數值就不會更新到thrustVec內了。
+    //如此一來還會保有每次偵測點未震盪歸0的水平推力，也因pi.inputEnabled = false; 水平推力逐漸至0，當pi.inputEnabled還未開啟時(當前使用pi.inputEnabled = false;動作未結束，或沒再開啟pi.inputEnabled)就不會有多餘的水平推力更新了。
+    private bool canAttack;//加這Falg讓輸入攻擊信號後能撥出攻擊動作的條件範圍縮小
 
     //要做走路控制要有的組件 1.物件本身GameObject 2.控制信號模塊(自寫) 3.物理系統Rigidbody 或 Character Control
     // Use this for initialization
@@ -33,6 +41,7 @@ public class ActorControll : MonoBehaviour
         anim = modle.GetComponent<Animator>();
         pi = GetComponent<PlayerInput>();
         rigid = GetComponent<Rigidbody>();
+        col = GetComponent<CapsuleCollider>();
 	}
 	
 	// Update is called once per frame
@@ -44,18 +53,24 @@ public class ActorControll : MonoBehaviour
         if (pi.isJump == true)
         {
             anim.SetTrigger("jump");
+            canAttack = false;//當觸發跳躍信號canAttack = false;將不會撥出攻擊動作
         }
         //attack觸發
-        if (pi.isAttack == true)
+        //if (pi.isAttack == true&&CheckState("ground")&&anim.GetBool("isGround")==true)//此用多加了很多偵測條件，依然無法解決跳起來可快速接攻擊，及翻滾可快速接攻擊問題
+        //{
+        //    anim.SetTrigger("attack");
+        //}
+
+        if (pi.isAttack == true && CheckState("ground") && canAttack == true)
         {
-            anim.SetTrigger("attack");
+            anim.SetTrigger("attack");    
         }
         //roll觸發
-        if (rigid.velocity.magnitude > 1.0f)
+        if (rigid.velocity.magnitude > 5.0f)
         {
             anim.SetTrigger("roll");
         }
-
+        //print(CheckState("idle", "Attack"));//確認自己做好CheckState()方法可不可實行
     }
 
     //將控制器訊號輸入至Animator做銜接
@@ -84,7 +99,7 @@ public class ActorControll : MonoBehaviour
             //重構
             modle.transform.forward = Vector3.Slerp(modle.transform.forward, pi.Dvec, turnSpeed);
         }
-        ////移動動量 純量為pi.Dmg*當下模型向量*移動速度(為了吻合動畫節奏)。再用三元表示式判斷isRun是否為真 真:乘2 否:乘1
+        ////移動動量 純量為pi.Dmg*當下模型向量*移動速度(為了吻合動畫節奏)。再用三元表示式判斷isRun是否為真 真:乘runMultiple 否:乘1
         //planarVec = pi.Dmag * modle.transform.forward * walkSpeed * ((pi.isRun) ? runMultiple : 1.0f);
 
         //為了讓跳躍起來能有移動動量
@@ -102,6 +117,15 @@ public class ActorControll : MonoBehaviour
         rigid.velocity = new Vector3(planarVec.x, rigid.velocity.y, planarVec.z) + thrustVec;//thrustVec加個跳躍高度向量
         thrustVec = Vector3.zero;//在觸發那瞬間才會有推力，之後便歸0
         
+    }
+
+    //做一個確認當前動畫狀態Layer和State的布林方法，為了在輸入訊號後撥動畫能有更多條件能判斷，但不一定有用
+    private bool CheckState(string stateName,string layerName="Base Layer")
+    {
+        //int layerImdex = anim.GetLayerIndex(layerName);
+        //bool result = anim.GetCurrentAnimatorStateInfo(layerImdex).IsName(stateName);
+        //重構
+        return anim.GetCurrentAnimatorStateInfo(anim.GetLayerIndex(layerName)).IsName(stateName);
     }
 
 
@@ -126,7 +150,6 @@ public class ActorControll : MonoBehaviour
 
     public void isGround()
     {
-
         anim.SetBool("isGround", true);
     }
     public void isNotGround()
@@ -138,12 +161,18 @@ public class ActorControll : MonoBehaviour
 
     public void OnGroundEnter()
     {
-        //因為要保持跳躍後依然有移動動量，
-        //因此使用了在Ground動畫模塊(在地上)時才發出訊號OnGroundEnter，
-        //在這時才lockPlanar = false;
-        pi.inputEnabled = true;
-        lockPlanar = false;
+        
+        pi.inputEnabled = true;//接觸地面時才能做操控信號輸入
+        lockPlanar = false;//保持跳躍後依然有移動動量
+        canAttack = true;  //接觸地面後可做其他控制時再將canAttack開啟
+        col.material = frictionOne;//設置物理材質摩擦力為1
     }
+
+    public void OnGroundExit()
+    {
+        col.material = frictionZero;//設置物理材質摩擦力為0
+    }
+
 
     public void OnFallEnter()
     {
@@ -160,7 +189,9 @@ public class ActorControll : MonoBehaviour
     //攔截使用Update每幀發出訊號的方法，解決動作順移到定點問題
     public void OnRollUpdate()
     {
+
         thrustVec = modle.transform.forward * anim.GetFloat("rollVelocity");
+
     }
     public void OnJabEnter()
     {
@@ -177,14 +208,14 @@ public class ActorControll : MonoBehaviour
     public void OnAttackIdleEnter()
     {
         pi.inputEnabled = true;
-        //lockPlanar = false;//目前不懂為何不需要20181017
+        //lockPlanar = false;//不需要，因為我們不需要移動控制震盪後的水平推力，沒有開啟就不用關閉
         anim.SetLayerWeight(1, 0f);//圖層1為attack層，因打數字不好判別所以使用anim.GetLayerIndex("Attack")如下方方法
         
     }
     public void OnAttack1hAEnter()
     {
         pi.inputEnabled = false;
-        //lockPlanar = true;//目前不懂為何不需要20181017
+        //lockPlanar = true;//不需要，因為我們不需要移動控制震盪後的水平推力
         anim.SetLayerWeight(anim.GetLayerIndex("Attack"), 1.0f);//anim.GetLayerIndex("Attack")=圖層1=int 1
         
     }
