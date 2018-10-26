@@ -33,6 +33,7 @@ public class ActorControll : MonoBehaviour
     //再來就是將平面動量Flag更新lockPlanar = true;(鎖死)，將不會因pi.inputEnabled = false;(鎖死)控制信號導致targetDRight = 0;的數值進而導致pi.Dmag = 0;的數值就不會更新到thrustVec內了。
     //如此一來還會保有每次偵測點未震盪歸0的水平推力，也因pi.inputEnabled = false; 水平推力逐漸至0，當pi.inputEnabled還未開啟時(當前使用pi.inputEnabled = false;動作未結束，或沒再開啟pi.inputEnabled)就不會有多餘的水平推力更新了。
     private bool canAttack;//加這Falg讓輸入攻擊信號後能撥出攻擊動作的條件範圍縮小
+    private float lerpTarget;//Attack圖層目標權重值
 
     //要做走路控制要有的組件 1.物件本身GameObject 2.控制信號模塊(自寫) 3.物理系統Rigidbody 或 Character Control
     // Use this for initialization
@@ -209,19 +210,30 @@ public class ActorControll : MonoBehaviour
     {
         pi.inputEnabled = true;
         //lockPlanar = false;//不需要，因為我們不需要移動控制震盪後的水平推力，沒有開啟就不用關閉
-        anim.SetLayerWeight(1, 0f);//圖層1為attack層，因打數字不好判別所以使用anim.GetLayerIndex("Attack")如下方方法
-        
+        //anim.SetLayerWeight(1, 0f);//圖層1為attack層，因打數字不好判別所以使用anim.GetLayerIndex("Attack")如下方方法     
+        lerpTarget = 0f;
+    }
+    public void OnAttackIdleUpdate()
+    {
+        anim.SetLayerWeight(anim.GetLayerIndex("Attack"), Mathf.Lerp(anim.GetLayerWeight(anim.GetLayerIndex("Attack")), lerpTarget, 0.4f));
     }
     public void OnAttack1hAEnter()
     {
         pi.inputEnabled = false;
         //lockPlanar = true;//不需要，因為我們不需要移動控制震盪後的水平推力
-        anim.SetLayerWeight(anim.GetLayerIndex("Attack"), 1.0f);//anim.GetLayerIndex("Attack")=圖層1=int 1
-        
+        lerpTarget = 1.0f;
+
     }
     public void OnAttack1hAUpdate()
     {
         thrustVec = modle.transform.forward * anim.GetFloat("attackh1AVelocity");
+        //float currentWeight = anim.GetLayerWeight(anim.GetLayerIndex("Attack"));//區域變數，取得當前動畫圖層權重。
+        //currentWeight = Mathf.Lerp(currentWeight, lerpTarget, 0.1f);
+        //重構1
+        //float currentWeight = Mathf.Lerp(anim.GetLayerWeight(anim.GetLayerIndex("Attack")), lerpTarget, 0.1f);
+        //anim.SetLayerWeight(anim.GetLayerIndex("Attack"), currentWeight);//anim.GetLayerIndex("Attack")=圖層1=int 1
+        //重構2
+        anim.SetLayerWeight(anim.GetLayerIndex("Attack"), Mathf.Lerp(anim.GetLayerWeight(anim.GetLayerIndex("Attack")), lerpTarget, 0.4f));
     }
 
 }
